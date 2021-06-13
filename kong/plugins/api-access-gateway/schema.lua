@@ -22,6 +22,12 @@ return {
                             default = false,
                         }
                     },
+                    {
+                        expire_time = {
+                            type = "number",
+                            default = 10,
+                        }
+                    },
                 },
             },
         },

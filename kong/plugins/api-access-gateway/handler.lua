@@ -1,4 +1,6 @@
 local global_config = require "kong.const.const"
+local redis = require "kong.util.redis"
+local json = require "cjson"
 
 local CustomHandler = {
     VERSION  = "1.0.0",
@@ -34,22 +36,29 @@ function CustomHandler:access(config)
     -- Implement logic for the rewrite phase here (http)
     kong.log("access")
 
-    if config.skip_auth then
-        local body = "{\"Code\":\"200\",\"Msg\":\"skip_auth = false\"}"
-        kong.response.exit(200, body, { ["Content-Type"] = "application/json; charset=utf-8" })
-        return
+    local query = kong.request.get_query()
+
+    if not config.skip_auth then
+        if query["token"] ~= "tencent" then
+            return kong.response.exit(200, { code = 400, err = "token error!" })
+        end
     end
 
-    local query_secret = kong.request.get_query_arg("secret")
-    local secret = global_config.secret
-    if query_secret == secret then
-        local body = "{\"Code\":\"200\",\"Msg\":\"skip_auth = true\"}"
-        kong.response.exit(200, body, { ["Content-Type"] = "application/json; charset=utf-8" })
-        return
+    local red = redis:new(global_config.opts)
+    if query["lock"] then
+        -- NX SET if Not eXists
+        -- EX 过期时间，seconds
+        -- 成功：ok，失败：nil
+        local ok, err = red:set("lock", 1, "NX", "EX", config.expire_time or 10)
+        kong.log(ok, err)
+        if err then
+            return kong.response.exit(200, { code = 400, err = err })
+        end
+        if not ok then
+            return kong.response.exit(200, { code = 400, data = "already lock." })
+        end
     end
-
-    local body = "{\"ErrorCode\":\"50000\",\"ErrorMsg\":\"密钥错误！\"}"
-    kong.response.exit(200, body, { ["Content-Type"] = "application/json; charset=utf-8" })
+    return kong.response.exit(200, { code = 200, err = "ok..." })
 end
 
 -- 从上游服务接收到所有响应头字节时执行

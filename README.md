@@ -44,7 +44,7 @@ docker run --rm \
 4. 启动kong
 
 ```
-docker run -d --name kong \
+docker run -it -d --name kong \
      --network=kong-net \
      -e "KONG_DATABASE=postgres" \
      -e "KONG_PG_HOST=kong-database" \
@@ -64,8 +64,9 @@ docker run -d --name kong \
      -p 127.0.0.1:8444:8444 \
      kong:latest
 
+// -it参数表示伪终端，-d参数表示后台运行
 // D:\\kong-gateway 修改为本地路径
-// docker run -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong:latest
+// docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong:latest
 ```
 访问：http://localhost:8001/
 
@@ -151,38 +152,42 @@ function CustomHandler:access(config)
     -- Implement logic for the rewrite phase here (http)
     kong.log("access")
 
-    if config.skip_auth then
-        local body = "{\"Code\":\"200\",\"Msg\":\"skip_auth = false\"}"
-        kong.response.exit(200, body, { ["Content-Type"] = "application/json; charset=utf-8" })
-        return
+    local query = kong.request.get_query()
+
+    if not config.skip_auth then
+        if query["token"] ~= "tencent" then
+            return kong.response.exit(200, { code = 400, err = "token error!" })
+        end
     end
 
-    local query_secret = kong.request.get_query_arg("secret")
-    local secret = global_config.secret
-    if query_secret == secret then
-        local body = "{\"Code\":\"200\",\"Msg\":\"skip_auth = true\"}"
-        kong.response.exit(200, body, { ["Content-Type"] = "application/json; charset=utf-8" })
-        return
+    local red = redis:new(global_config.opts)
+    if query["lock"] then
+        -- NX SET if Not eXists
+        -- EX 过期时间，seconds
+        -- 成功：ok，失败：nil
+        local ok, err = red:set("lock", 1, "NX", "EX", config.expire_time or 10)
+        kong.log(ok, err)
+        if err then
+            return kong.response.exit(200, { code = 400, err = err })
+        end
+        if not ok then
+            return kong.response.exit(200, { code = 400, data = "already lock." })
+        end
     end
-
-    local body = "{\"ErrorCode\":\"50000\",\"ErrorMsg\":\"密钥错误！\"}"
-    kong.response.exit(200, body, { ["Content-Type"] = "application/json; charset=utf-8" })
+    return kong.response.exit(200, { code = 200, err = "ok..." })
 end
 ```
 
 - skip_auth = false
+- expire_time = 10
 
 ![](docs/test-1.png)
 
-![](docs/test-1-1.png)
-
-- skip_auth = true
-
 ![](docs/test-2.png)
 
-![](docs/test-2-1.png)
+![](docs/test-3.png)
 
-![](docs/test-2-2.png)
+![](docs/test-4.png)
 
 ## 插件开发
 
