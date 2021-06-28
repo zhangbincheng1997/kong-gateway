@@ -6,6 +6,16 @@
 
 [菜鸟教程](https://www.runoob.com/docker/windows-docker-install.html)
 
+## 打包镜像
+```
+docker build -f Dockerfile -t kong-gateway .
+ 
+build参数：
+-f docker配置文件
+-t 镜像名称
+. 上下文环境的目录
+```
+
 ## 网关安装
 1. 创建环境
 
@@ -62,11 +72,11 @@ docker run -it -d --name kong \
      -p 8443:8443 \
      -p 127.0.0.1:8001:8001 \
      -p 127.0.0.1:8444:8444 \
-     kong:latest
+     kong-gateway
 
 // -it参数表示伪终端，-d参数表示后台运行
 // D:\\kong-gateway 修改为本地路径
-// docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong:latest
+// docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong-gateway
 ```
 访问：http://localhost:8001/
 
@@ -146,48 +156,58 @@ curl -i -X POST \
 
 5. 网关测试
 
-```lua
--- 为客户的每一个请求而执行，并在它被代理到上游服务之前执行
-function CustomHandler:access(config)
-    -- Implement logic for the rewrite phase here (http)
-    kong.log("access")
+- [JWT](https://jwt.io/)
 
-    local query = kong.request.get_query()
+![](docs/jwt.png)
 
-    if not config.skip_auth then
-        if query["token"] ~= "tencent" then
-            return kong.response.exit(200, { code = 400, err = "token error!" })
-        end
-    end
+```
+TestToken
 
-    local red = redis:new(global_config.opts)
-    if query["lock"] then
-        -- NX SET if Not eXists
-        -- EX 过期时间，seconds
-        -- 成功：ok，失败：nil
-        local ok, err = red:set("lock", 1, "NX", "EX", config.expire_time or 10)
-        kong.log(ok, err)
-        if err then
-            return kong.response.exit(200, { code = 400, err = err })
-        end
-        if not ok then
-            return kong.response.exit(200, { code = 400, data = "already lock." })
-        end
-    end
-    return kong.response.exit(200, { code = 200, err = "ok..." })
-end
+{
+  "iss": "roro",
+  "uid": 2021314
+}
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJyb3JvIiwidWlkIjoyMDIxMzE0fQ.SGv-R0BWv6rYzYW9i-ZvfxNZbOygNGirRxHUoncIEMQ
 ```
 
 - skip_auth = false
-- expire_time = 10
 
-![](docs/test-1.png)
+![](docs/test-1-1.png)
 
-![](docs/test-2.png)
+![](docs/test-1-2.png)
 
-![](docs/test-3.png)
+- skip_auth = true
 
-![](docs/test-4.png)
+![](docs/test-2-1.png)
+
+![](docs/test-2-2.png)
+
+![](docs/test-2-3.png)
+
+- rate_limit
+
+```lua
+local function lock(uid)
+    -- 连接池
+    local red = redis:new(global_config.redis)
+    -- NX SET if Not eXists
+    -- EX 过期时间，seconds
+    -- 成功：ok，失败：nil
+    local ok, err = red:set(uid, 1, "NX", "EX", global_config.redis.expire_time or 10)
+    kong.log(ok, err)
+    if err then
+        return response:err(error.redis_error, err)
+    end
+    if not ok then
+        return response:err(error.rate_limit)
+    end
+end
+```
+
+![](docs/test-3-1.png)
+
+![](docs/test-3-2.png)
 
 ## 插件开发
 

@@ -1,6 +1,8 @@
 local global_config = require "kong.const.const"
+local response = require "kong.util.response"
+local error = require "kong.util.error"
 local redis = require "kong.util.redis"
-local json = require "cjson"
+local jwt = require "luajwt"
 
 local CustomHandler = {
     VERSION  = "1.0.0",
@@ -31,34 +33,68 @@ function CustomHandler:rewrite(config)
     kong.log("rewrite")
 end
 
+local function lock(uid)
+    -- 连接池
+    local red = redis:new(global_config.redis)
+    -- NX SET if Not eXists
+    -- EX 过期时间，seconds
+    -- 成功：ok，失败：nil
+    local ok, err = red:set(uid, 1, "NX", "EX", global_config.redis.expire_time or 10)
+    kong.log(ok, err)
+    if err then
+        return response:err(error.redis_error, err)
+    end
+    if not ok then
+        return response:err(error.rate_limit)
+    end
+end
+
 -- 为客户的每一个请求而执行，并在它被代理到上游服务之前执行
 function CustomHandler:access(config)
     -- Implement logic for the rewrite phase here (http)
     kong.log("access")
 
-    local query = kong.request.get_query()
-
+    local claims = {}
+    local err
     if not config.skip_auth then
-        if query["token"] ~= "tencent" then
-            return kong.response.exit(200, { code = 400, err = "token error!" })
+        claims = {
+            iss = global_config.auth.iss,
+            rid = global_config.role.GUEST,
+            uid = 1,
+        }
+    else
+        local authorization = kong.request.get_header("Authorization")
+        if not authorization or authorization == "" then
+            return response:err(error.jwt_error, "jwt is nil.")
         end
-    end
-
-    local red = redis:new(global_config.opts)
-    if query["lock"] then
-        -- NX SET if Not eXists
-        -- EX 过期时间，seconds
-        -- 成功：ok，失败：nil
-        local ok, err = red:set("lock", 1, "NX", "EX", config.expire_time or 10)
-        kong.log(ok, err)
+        claims, err = jwt.decode(authorization, global_config.auth.token, true)
         if err then
-            return kong.response.exit(200, { code = 400, err = err })
+            return response:err(error.jwt_error, err)
         end
-        if not ok then
-            return kong.response.exit(200, { code = 400, data = "already lock." })
+        local iss = claims["iss"]
+        if not iss then
+            return response:err(error.iss_error, "iss is nil.")
         end
+        if iss ~= global_config.auth.iss then
+            return response:err(error.iss_error, "iss is fake news.")
+        end
+        local uid = claims["uid"]
+        if not uid then
+            return response:err(error.uid_error, "uid is nil.")
+        end
+        uid = tonumber(uid)
+        if not uid then
+            return response:err(error.uid_error, "uid is not number.")
+        end
+        err = lock(uid)
+        if err then return err end
+        claims = {
+            iss = global_config.auth.iss,
+            rid = global_config.role.ADMIN,
+            uid = uid,
+        }
     end
-    return kong.response.exit(200, { code = 200, err = "ok..." })
+    return response:ok(claims)
 end
 
 -- 从上游服务接收到所有响应头字节时执行
