@@ -34,7 +34,8 @@ docker run -d --name kong-database \
      -e "POSTGRES_PASSWORD=kong" \
      postgres:9.6
 
-// docker run -d --name kong-database --network=kong-net -p 5432:5432 -e "POSTGRES_DB=kong" -e "POSTGRES_USER=kong" -e "POSTGRES_PASSWORD=kong" postgres:9.6
+// 换行
+docker run -d --name kong-database --network=kong-net -p 5432:5432 -e "POSTGRES_DB=kong" -e "POSTGRES_USER=kong" -e "POSTGRES_PASSWORD=kong" postgres:9.6
 ```
 
 3. 初始化数据库
@@ -48,7 +49,8 @@ docker run --rm \
      -e "KONG_PG_PASSWORD=kong" \
      kong:latest kong migrations bootstrap
 
-// docker run --rm --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" kong:latest kong migrations bootstrap
+// 换行
+docker run --rm --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" kong:latest kong migrations bootstrap
 ```
 
 4. 启动kong
@@ -74,9 +76,11 @@ docker run -it -d --name kong \
      -p 127.0.0.1:8444:8444 \
      kong-gateway
 
+// 换行
+docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong-gateway
+
 // -it参数表示伪终端，-d参数表示后台运行
 // D:\\kong-gateway 修改为本地路径
-// docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong-gateway
 ```
 访问：http://localhost:8001/
 
@@ -90,7 +94,8 @@ docker run -d --name konga \
      -p 1337:1337 \
      pantsel/konga
 
-// docker run -d --name konga --network kong-net -e "DB_ADAPTER=postgres" -e "DB_URI=postgresql://kong:kong@kong-database:5432/konga" -p 1337:1337 pantsel/konga
+// 换行
+docker run -d --name konga --network kong-net -e "DB_ADAPTER=postgres" -e "DB_URI=postgresql://kong:kong@kong-database:5432/konga" -p 1337:1337 pantsel/konga
 ```
 访问：http://localhost:1337/
 
@@ -145,7 +150,7 @@ curl -i -X POST \
 ```
 curl -i -X POST \
 --url http://localhost:8001/routes/e72acd4e-3f72-4075-afe3-60e77a09a932/plugins \
---data '{"name":"api-access-gateway","config":{"skip_auth":false}}' \
+--data '{"name":"api-access-gateway","config":{"skip_auth":true}}' \
 ```
 
 - 图形方式：
@@ -171,13 +176,13 @@ TestToken
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJyb3JvIiwidWlkIjoyMDIxMzE0fQ.SGv-R0BWv6rYzYW9i-ZvfxNZbOygNGirRxHUoncIEMQ
 ```
 
-- skip_auth = false
+- skip_auth = true
 
 ![](docs/test-1-1.png)
 
 ![](docs/test-1-2.png)
 
-- skip_auth = true
+- skip_auth = false
 
 ![](docs/test-2-1.png)
 

@@ -19,7 +19,7 @@ return {
                     {
                         skip_auth = {
                             type = "boolean",
-                            default = false,
+                            default = true,
                         }
                     },
                 },

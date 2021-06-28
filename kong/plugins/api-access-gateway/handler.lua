@@ -56,7 +56,7 @@ function CustomHandler:access(config)
 
     local claims = {}
     local err
-    if not config.skip_auth then
+    if config.skip_auth then
         claims = {
             iss = global_config.auth.iss,
             rid = global_config.role.GUEST,
