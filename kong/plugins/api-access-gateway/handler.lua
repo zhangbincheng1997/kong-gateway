@@ -9,30 +9,6 @@ local CustomHandler = {
     PRIORITY = 10
 }
 
--- 在每个 Nginx 工作进程启动时执行
-function CustomHandler:init_worker()
-    -- Implement logic for the init_worker phase here (http/stream)
-    kong.log("init_worker")
-end
-
--- Stream Module is used for Plugins written for TCP and UDP stream connections
---function CustomHandler:preread(config)
---    -- Implement logic for the preread phase here (stream)
---    kong.log("preread")
---end
-
--- 在SSL握手阶段的SSL证书服务阶段执行
-function CustomHandler:certificate(config)
-    -- Implement logic for the certificate phase here (http/stream)
-    kong.log("certificate")
-end
-
--- 从客户端接收作为重写阶段处理程序的每个请求执行。在这个阶段，无论是API还是消费者都没有被识别，因此这个处理器只在插件被配置为全局插件时执行
-function CustomHandler:rewrite(config)
-    -- Implement logic for the rewrite phase here (http)
-    kong.log("rewrite")
-end
-
 local function lock(uid)
     -- 连接池
     local red = redis:new(global_config.redis)
@@ -95,6 +71,12 @@ function CustomHandler:access(config)
         }
     end
     return response:ok(claims)
+end
+
+-- 在每个 Nginx 工作进程启动时执行
+function CustomHandler:init_worker()
+    -- Implement logic for the init_worker phase here (http/stream)
+    kong.log("init_worker")
 end
 
 -- 从上游服务接收到所有响应头字节时执行

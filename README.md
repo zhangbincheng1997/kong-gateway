@@ -67,7 +67,7 @@ docker run -it -d --name kong \
      -e "KONG_PROXY_ERROR_LOG=/dev/stderr" \
      -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" \
      -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" \
-     --env "KONG_PLUGINS=bundled,api-access-gateway" \
+     --env "KONG_PLUGINS=bundled,api-access-gateway,my-global-plugin" \
      --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" \
      -v D:\\kong-gateway:/data/kong \
      -p 8000:8000 \
@@ -77,10 +77,11 @@ docker run -it -d --name kong \
      kong-gateway
 
 // 换行
-docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong-gateway
+docker run -it -d --name kong --network=kong-net -e "KONG_DATABASE=postgres" -e "KONG_PG_HOST=kong-database" -e "KONG_PG_USER=kong" -e "KONG_PG_PASSWORD=kong" -e "KONG_PROXY_ACCESS_LOG=/dev/stdout" -e "KONG_ADMIN_ACCESS_LOG=/dev/stdout" -e "KONG_PROXY_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_ERROR_LOG=/dev/stderr" -e "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl" --env "KONG_PLUGINS=bundled,api-access-gateway,my-global-plugin" --env "KONG_LUA_PACKAGE_PATH=./?.lua;./?/init.lua;/data/kong/?.lua;" -v D:\\kong-gateway:/data/kong -p 8000:8000 -p 8443:8443 -p 127.0.0.1:8001:8001 -p 127.0.0.1:8444:8444 kong-gateway
 
 // -it参数表示伪终端，-d参数表示后台运行
-// D:\\kong-gateway 修改为本地路径
+// D:\\kong-gateway 加载的路径
+// api-access-gateway,my-global-plugin 加载的插件
 ```
 访问：http://localhost:8001/
 
@@ -159,7 +160,11 @@ curl -i -X POST \
 
 ![](docs/plugin-2.png)
 
-5. 网关测试
+5. 全局插件Global-Plugins
+
+![](docs/global-plugin.png)
+
+## 网关测试
 
 - [JWT](https://jwt.io/)
 
@@ -173,7 +178,7 @@ TestToken
   "uid": 2021314
 }
 
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJyb3JvIiwidWlkIjoyMDIxMzE0fQ.SGv-R0BWv6rYzYW9i-ZvfxNZbOygNGirRxHUoncIEMQ
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJyb3JvIiwidWlkIjoyMDIxMzE0fQ.SGv-R0BWv6rYzYW9i-ZvfxNZbOygNGirRxHUoncIEMQ
 ```
 
 - skip_auth = true
